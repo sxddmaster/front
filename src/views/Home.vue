@@ -4,33 +4,28 @@
       <h1>欢迎使用 AI 助手</h1>
       <p class="subtitle">智能对话与数据管理，让工作更高效</p>
     </div>
-    
-    <el-row :gutter="40" class="home-row" justify="center">
-      <el-col :xs="24" :sm="24" :md="12" :lg="10" :xl="8">
-        <div class="tile" @click="goTo('chat')">
-          <div class="tile-content">
-            <el-icon size="72"><ChatDotRound /></el-icon>
-            <h2>Chat with AI</h2>
-            <p>与 AI 助手对话，获取智能回复和建议</p>
-            <div class="tile-footer">
-              <span class="enter-hint">点击进入 <el-icon><ArrowRight /></el-icon></span>
-            </div>
+    <div class="home-row-flex">
+      <div class="tile" @click="goTo('chat')">
+        <div class="tile-content">
+          <el-icon size="72"><ChatDotRound /></el-icon>
+          <h2>Chat with AI</h2>
+          <p>与 AI 助手对话，获取智能回复和建议</p>
+          <div class="tile-footer">
+            <span class="enter-hint">点击进入 <el-icon><ArrowRight /></el-icon></span>
           </div>
         </div>
-      </el-col>
-      <el-col :xs="24" :sm="24" :md="12" :lg="10" :xl="8">
-        <div class="tile" @click="goTo('table')">
-          <div class="tile-content">
-            <el-icon size="72"><List /></el-icon>
-            <h2>Data Table</h2>
-            <p>查看和管理数据，支持筛选和导出</p>
-            <div class="tile-footer">
-              <span class="enter-hint">点击进入 <el-icon><ArrowRight /></el-icon></span>
-            </div>
+      </div>
+      <div class="tile" @click="goTo('table')">
+        <div class="tile-content">
+          <el-icon size="72"><List /></el-icon>
+          <h2>Data Table</h2>
+          <p>查看和管理数据，支持筛选和导出</p>
+          <div class="tile-footer">
+            <span class="enter-hint">点击进入 <el-icon><ArrowRight /></el-icon></span>
           </div>
         </div>
-      </el-col>
-    </el-row>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -76,18 +71,16 @@ const goTo = (page: string) => {
   margin: 0;
 }
 
-.home-row {
+.home-row-flex {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
   flex: 1;
-  max-width: 1400px;
   width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 40px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .tile {
@@ -175,9 +168,9 @@ const goTo = (page: string) => {
   .subtitle {
     font-size: 1.1rem;
   }
-  .home-row {
-    padding: 0 24px 40px;
+  .home-row-flex {
     flex-direction: column;
+    padding: 0 24px 40px;
   }
   .tile {
     height: 400px;
