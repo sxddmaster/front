@@ -11,7 +11,50 @@
             <div class="text">
               <div class="role-name">{{ msg.role === 'user' ? '你' : '' }}</div>
               <div class="content" :class="msg.role">
-                {{ msg.text }}
+                <!-- 用户消息：自动格式化JSON并靠左显示 -->
+                <template v-if="msg.role === 'user'">
+                  <div class="user-message-bubble">
+                    <template v-if="msg.fileName && msg.fileRaw">
+                      <span class="chat-file-badge" @click="handlePreviewFile({ name: msg.fileName, raw: msg.fileRaw, uid: '' })">
+                        <el-icon class="chat-file-icon"><PictureFilled /></el-icon>
+                        <span class="chat-file-name">{{ msg.fileName }}</span>
+                      </span>
+                    </template>
+                    <template v-if="msg.image && msg.imageType === 'image'">
+                      <img :src="msg.image" class="chat-image" />
+                    </template>
+                    <template v-if="msg.text">
+                      <div>{{ msg.text }}</div>
+                    </template>
+                  </div>
+                </template>
+                <!-- AI消息：优先展示text，其次voucher -->
+                <template v-else-if="msg.role === 'ai'">
+                  <template v-if="msg.text">
+                    <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+                  </template>
+                  <template v-else-if="msg.voucher">
+                    <div>摘要：{{ msg.voucher.summary }}</div>
+                    <table class="voucher-table">
+                      <thead>
+                        <tr>
+                          <th>科目</th>
+                          <th>明细科目</th>
+                          <th>借方</th>
+                          <th>贷方</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(entry, i) in msg.voucher.entries" :key="i">
+                          <td>{{ entry.subject }}</td>
+                          <td>{{ entry.detailSubject }}</td>
+                          <td>{{ entry.debit }}</td>
+                          <td>{{ entry.credit }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </template>
+                </template>
               </div>
             </div>
           </div>
@@ -23,44 +66,15 @@
       </div>
       
       <div class="input-area">
-        <div v-if="uploadedFiles.length" class="uploaded-files">
-          <div class="uploaded-files-header">
-            <span>已上传文件</span>
-            <el-button type="primary" link @click="clearFiles">
-              <el-icon><Delete /></el-icon>
-              清空
+        <div v-if="uploadedFiles.length" class="uploaded-files-list">
+          <div v-for="(file, idx) in uploadedFiles" :key="file.uid || file.name" class="file-card" @click="handlePreviewFile(file)">
+            <el-icon class="file-icon"><PictureFilled /></el-icon>
+            <span class="file-name">{{ file.name }}</span>
+            <el-button class="file-remove-btn" type="danger" link @click.stop="removeUploadedFile(idx)">
+              <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          <div class="uploaded-files-list">
-            <div v-for="(file, idx) in uploadedFiles" :key="idx" class="file-card">
-              <div class="file-info">
-                <el-icon class="file-icon"><Document /></el-icon>
-                <div class="file-details">
-                  <span class="file-name">{{ file.name }}</span>
-                  <span class="file-size">{{ file.size }}</span>
-                </div>
-              </div>
-              <div class="file-actions">
-                <el-button 
-                  type="primary" 
-                  link 
-                  @click="handlePreviewFile(file)"
-                  :disabled="!isPreviewable(file.type)"
-                >
-                  <el-icon><View /></el-icon>
-                </el-button>
-                <el-button 
-                  type="danger" 
-                  link 
-                  @click="removeUploadedFile(idx)"
-                >
-                  <el-icon><Close /></el-icon>
-                </el-button>
-              </div>
-            </div>
-          </div>
         </div>
-
         <div class="input-wrapper">
           <el-input
             v-model="input"
@@ -78,15 +92,16 @@
               :show-file-list="false"
               :on-change="handleFileChange"
               :before-remove="handleBeforeRemove"
-              multiple
+              :accept="'.png,.jpg,.jpeg,.bmp,.gif,.tiff,.webp,.pdf'"
               class="upload-btn"
             >
               <el-button 
                 type="primary" 
                 class="upload-button"
                 :loading="uploading"
+                circle
               >
-                <el-icon><Plus /></el-icon>
+                <el-icon><PictureFilled /></el-icon>
               </el-button>
             </el-upload>
             <el-button 
@@ -95,6 +110,7 @@
               @click="send"
               class="send-btn"
               :loading="loading"
+              circle
             >
               <el-icon><Position /></el-icon>
             </el-button>
@@ -102,45 +118,45 @@
         </div>
         <div class="input-tips">AI 助手可能会出错，请验证重要信息</div>
       </div>
-
-      <el-dialog
-        v-model="previewVisible"
-        :title="currentPreviewFile?.name"
-        width="80%"
-        class="preview-dialog"
-      >
-        <div class="preview-content">
-          <img v-if="isImage" :src="previewUrl" class="preview-image" />
-          <iframe v-else-if="isPdf" :src="previewUrl" class="preview-pdf"></iframe>
-          <div v-else class="preview-unsupported">
-            该文件类型暂不支持预览
-          </div>
+      <el-dialog v-model="previewVisible" width="60vw" :title="previewFile?.name || '文件预览'">
+        <div v-if="isImagePreview">
+          <img :src="previewUrl" class="preview-image" />
         </div>
+        <div v-else-if="isPdfPreview">
+          <iframe :src="previewUrl" class="preview-pdf"></iframe>
+        </div>
+        <div v-else>暂不支持预览该文件类型</div>
       </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed, onUnmounted } from 'vue'
-import { User, Service, Position, Plus, Document, View, Delete, Close } from '@element-plus/icons-vue'
-import type { UploadFile, UploadInstance } from 'element-plus'
+import { ref, nextTick, onMounted, computed } from 'vue'
+import { User, Service, Position, Plus, PictureFilled, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendChatMessage } from '../api/chat'
-import type { ChatResponse } from '../api/chat'
+import type { UploadFile, UploadInstance } from 'element-plus'
 
-interface FileInfo {
-  name: string
-  size: string
-  url: string
-  type: string
-  raw: File
+interface VoucherEntry {
+  subject: string;
+  detailSubject: string;
+  debit: string;
+  credit: string;
+}
+interface VoucherResponse {
+  summary: string;
+  entries: VoucherEntry[];
 }
 
 interface ChatMessage {
   role: 'user' | 'ai'
   text: string
-  files?: FileInfo[]
+  voucher?: VoucherResponse
+  image?: string
+  imageType?: string
+  fileName?: string
+  fileRaw?: File | undefined
 }
 
 const input = ref('')
@@ -149,22 +165,12 @@ const loading = ref(false)
 const uploading = ref(false)
 const messagesRef = ref<HTMLElement>()
 const uploadRef = ref<UploadInstance>()
-const uploadedFiles = ref<FileInfo[]>([])
-
-// 文件预览相关
+const uploadedFiles = ref<{ name: string; raw: File; uid?: string }[]>([])
 const previewVisible = ref(false)
-const currentPreviewFile = ref<FileInfo | null>(null)
-const previewUrl = computed(() => currentPreviewFile.value?.url || '')
-
-const isImage = computed(() => {
-  if (!currentPreviewFile.value) return false
-  return currentPreviewFile.value.type.startsWith('image/')
-})
-
-const isPdf = computed(() => {
-  if (!currentPreviewFile.value) return false
-  return currentPreviewFile.value.type === 'application/pdf'
-})
+const previewFile = ref<{ name: string; raw: File; uid?: string } | null>(null)
+const previewUrl = ref('')
+const isImagePreview = computed(() => previewFile.value && previewFile.value.raw.type.startsWith('image/'))
+const isPdfPreview = computed(() => previewFile.value && previewFile.value.raw.type === 'application/pdf')
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -177,130 +183,123 @@ const handleEnter = (e: KeyboardEvent) => {
   send()
 }
 
-const send = async () => {
-  if (!canSend.value || loading.value) return
-  
-  const userMessage = input.value.trim()
-  input.value = ''
-  
-  // 创建消息对象，包含文本和文件
-  const message: ChatMessage = {
-    role: 'user',
-    text: userMessage,
-    files: uploadedFiles.value
-  }
-  
-  // 添加用户消息
-  messages.value.push(message)
-  await scrollToBottom()
-  
-  loading.value = true
-  
-  try {
-    // 调用后端 API
-    const response = await sendChatMessage(
-      userMessage, 
-      uploadedFiles.value.map(f => f.raw).filter((f): f is File => f !== undefined)
-    )
-    
-    // 添加 AI 回复
-    messages.value.push({
-      role: 'ai',
-      text: response.message
-    })
-  } catch (error) {
-    console.error('Error sending message:', error)
-    ElMessage.error('发送消息失败，请重试')
-  } finally {
-    loading.value = false
-    // 清空已上传文件
-    clearFiles()
-    await scrollToBottom()
-  }
-}
-
-// 处理文件选择
 const handleFileChange = (file: UploadFile) => {
   if (file.raw) {
-    // 检查文件大小（限制为10MB）
-    if (file.raw.size > 10 * 1024 * 1024) {
-      ElMessage.error('文件大小不能超过10MB')
-      return
+    const allowedTypes = [
+      'image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/gif', 'image/tiff', 'image/webp', 'application/pdf'
+    ];
+    if (!allowedTypes.includes(file.raw.type)) {
+      ElMessage.error('仅支持图片和PDF格式');
+      return;
     }
-    
-    const fileUrl = URL.createObjectURL(file.raw)
-    uploadedFiles.value.push({
-      name: file.raw.name,
-      size: formatFileSize(file.raw.size),
-      url: fileUrl,
-      type: file.raw.type,
-      raw: file.raw
-    })
+    uploadedFiles.value = [{ name: file.raw.name, raw: file.raw, uid: String(file.uid) }];
+  }
+}
+const handleBeforeRemove = () => true;
+
+const removeUploadedFile = (idx: number) => {
+  uploadedFiles.value.splice(idx, 1);
+}
+
+const send = async () => {
+  if (!canSend.value || loading.value) return;
+  const userMessage = input.value.trim();
+  input.value = '';
+
+  let imageBase64 = '';
+  let imageType = '';
+  let fileName = '';
+  let fileRaw: File | undefined = undefined;
+  if (uploadedFiles.value.length > 0) {
+    const file = uploadedFiles.value[0].raw;
+    fileName = uploadedFiles.value[0].name;
+    fileRaw = file;
+    if (file.type.startsWith('image/')) {
+      imageBase64 = await fileToBase64(file);
+      imageType = 'image';
+    } else if (file.type === 'application/pdf') {
+      imageBase64 = URL.createObjectURL(file);
+      imageType = 'pdf';
+    }
+  }
+
+  messages.value.push({
+    role: 'user',
+    text: userMessage,
+    image: imageBase64,
+    imageType,
+    fileName,
+    fileRaw
+  });
+  await scrollToBottom();
+
+  loading.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('message', userMessage);
+    if (uploadedFiles.value.length > 0) {
+      formData.append('file', uploadedFiles.value[0].raw);
+    }
+    const response = await sendChatMessage(formData);
+    if (typeof response === 'string') {
+      messages.value.push({ role: 'ai', text: response });
+    } else if (response && response.entries) {
+      messages.value.push({ role: 'ai', text: '', voucher: response });
+    } else {
+      messages.value.push({ role: 'ai', text: JSON.stringify(response) });
+    }
+  } catch (error) {
+    ElMessage.error('发送消息失败，请重试');
+  } finally {
+    loading.value = false;
+    uploadedFiles.value = [];
+    await scrollToBottom();
+  }
+};
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const canSend = computed(() => {
+  return uploadedFiles.value.length > 0;
+});
+
+// 判断字符串是否为JSON
+function isJson(str: string): boolean {
+  if (!str) return false
+  try {
+    const obj = JSON.parse(str)
+    return typeof obj === 'object' && obj !== null
+  } catch {
+    return false
+  }
+}
+// 格式化JSON字符串
+function formatJson(str: string): string {
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2)
+  } catch {
+    return str
   }
 }
 
-// 处理文件移除
-const handleBeforeRemove = (file: UploadFile) => {
-  return true
-}
-
-// 预览文件
-const handlePreviewFile = (file: FileInfo) => {
-  currentPreviewFile.value = file
+const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
+  previewFile.value = file
+  if (file.raw.type.startsWith('image/')) {
+    previewUrl.value = URL.createObjectURL(file.raw)
+  } else if (file.raw.type === 'application/pdf') {
+    previewUrl.value = URL.createObjectURL(file.raw)
+  } else {
+    previewUrl.value = ''
+  }
   previewVisible.value = true
 }
-
-// 移除已上传文件
-const removeUploadedFile = (index: number) => {
-  URL.revokeObjectURL(uploadedFiles.value[index].url)
-  uploadedFiles.value.splice(index, 1)
-}
-
-// 清空所有文件
-const clearFiles = () => {
-  uploadedFiles.value.forEach(file => {
-    URL.revokeObjectURL(file.url)
-  })
-  uploadedFiles.value = []
-}
-
-// 格式化文件大小
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-// 判断是否可以发送消息
-const canSend = computed(() => {
-  return input.value.trim() || uploadedFiles.value.length > 0
-})
-
-// 移除消息中的文件
-const removeMessageFile = (message: ChatMessage, fileIndex: number) => {
-  if (message.files) {
-    message.files.splice(fileIndex, 1)
-    if (message.files.length === 0) {
-      delete message.files
-    }
-  }
-}
-
-// 判断文件是否可预览
-const isPreviewable = (type: string) => {
-  return type.startsWith('image/') || type === 'application/pdf'
-}
-
-onMounted(() => {
-  scrollToBottom()
-})
-
-// 组件卸载时清理
-onUnmounted(() => {
-  clearFiles()
-})
 </script>
 
 <style scoped>
@@ -345,6 +344,9 @@ onUnmounted(() => {
 
 .user .message-content {
   flex-direction: row-reverse;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
 .ai .message-content {
@@ -376,6 +378,8 @@ onUnmounted(() => {
   flex: 1;
   padding-top: 4px;
   max-width: 80%;
+  background: none !important;
+  padding: 0 !important;
 }
 
 .user .text {
@@ -398,12 +402,14 @@ onUnmounted(() => {
   word-break: break-word;
   padding: 12px 16px;
   border-radius: 12px;
+  background: none !important;
+  padding: 0 !important;
 }
 
 .user .content {
   color: #fff;
-  background: #409EFF;
-  display: inline-block;
+  background: none !important;
+  padding: 0 !important;
 }
 
 .ai .content {
@@ -469,24 +475,6 @@ onUnmounted(() => {
   border-color: #409EFF;
 }
 
-.upload-btn {
-  display: inline-block;
-}
-
-.upload-button {
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-}
-
-.upload-button .el-icon {
-  font-size: 20px;
-}
-
 .send-btn {
   width: 48px;
   height: 48px;
@@ -506,123 +494,6 @@ onUnmounted(() => {
   color: #909399;
   font-size: 0.9rem;
   margin-top: 12px;
-}
-
-.uploaded-files {
-  max-width: 800px;
-  margin: 0 auto 12px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.uploaded-files-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-  color: #606266;
-}
-
-.uploaded-files-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.file-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  background: #f5f7fa;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.file-card:hover {
-  background: #f0f2f5;
-  border-color: #dcdfe6;
-}
-
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.file-icon {
-  font-size: 24px;
-  color: #909399;
-  flex-shrink: 0;
-}
-
-.file-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.file-name {
-  font-size: 0.95rem;
-  color: #303133;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-size {
-  font-size: 0.8rem;
-  color: #909399;
-}
-
-.file-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: 12px;
-  flex-shrink: 0;
-}
-
-.file-actions .el-button {
-  padding: 4px;
-}
-
-.file-actions .el-button.is-disabled {
-  opacity: 0.5;
-}
-
-.preview-dialog :deep(.el-dialog__body) {
-  padding: 0;
-}
-
-.preview-content {
-  height: 70vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f7fa;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.preview-pdf {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.preview-unsupported {
-  color: #909399;
-  font-size: 1.1rem;
 }
 
 @keyframes fadeIn {
@@ -658,44 +529,149 @@ onUnmounted(() => {
     padding: 16px;
   }
   
-  .upload-button,
   .send-btn {
     width: 40px;
     height: 40px;
   }
   
-  .upload-button .el-icon,
   .send-btn .el-icon {
     font-size: 18px;
   }
-  
-  .file-card {
-    padding: 8px;
-  }
-  
-  .file-icon {
-    font-size: 20px;
-  }
-  
-  .file-name {
-    font-size: 0.9rem;
-  }
-  
-  .file-size {
-    font-size: 0.75rem;
-  }
-  
-  .file-actions {
-    gap: 4px;
-  }
-  
-  .file-actions .el-button {
-    padding: 2px;
-  }
-  
-  .uploaded-files {
-    padding: 0 8px;
-  }
+}
+
+.voucher-table {
+  margin-top: 8px;
+  border-collapse: collapse;
+  width: 100%;
+}
+.voucher-table th, .voucher-table td {
+  border: 1px solid #b6c6e3;
+  padding: 4px 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.user-message-bubble {
+  background: #f8faf0;
+  color: #222e3a;
+  border-radius: 18px;
+  padding: 18px 28px;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  text-align: left;
+}
+
+.upload-btn .upload-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+.upload-btn .el-icon {
+  font-size: 22px;
+}
+.uploaded-files-list {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.file-card {
+  display: flex;
+  align-items: center;
+  background: #f8faf0;
+  border-radius: 12px;
+  padding: 6px 16px 6px 8px;
+  font-size: 15px;
+  color: #222e3a;
+  position: relative;
+  min-width: 120px;
+  box-shadow: 0 1px 4px rgba(80,120,200,0.04);
+  cursor: pointer;
+}
+.file-card:hover {
+  background: #f0f2f5;
+}
+.file-icon {
+  font-size: 22px;
+  color: #409EFF;
+  margin-right: 8px;
+}
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 16px;
+  color: #f56c6c;
+}
+
+.chat-image {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.chat-pdf {
+  width: 220px;
+  height: 220px;
+  border: none;
+  margin-bottom: 6px;
+  display: block;
+  border-radius: 10px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 60vh;
+  display: block;
+  margin: 0 auto;
+}
+.preview-pdf {
+  width: 100%;
+  height: 60vh;
+  border: none;
+}
+
+.chat-file-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #f8faf0;
+  border-radius: 8px;
+  padding: 4px 12px 4px 6px;
+  margin-bottom: 8px;
+  margin-right: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.chat-file-badge:hover {
+  background: #e3eaff;
+}
+.chat-file-icon {
+  font-size: 20px;
+  color: #409EFF;
+  margin-right: 6px;
+}
+.chat-file-name {
+  font-size: 15px;
+  color: #222e3a;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style> 
 

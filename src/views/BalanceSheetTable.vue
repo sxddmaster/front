@@ -15,15 +15,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in balanceList" :key="row.assetIndex">
-            <td class="item-col">{{ row.assetItem }}</td>
-            <td>{{ row.assetIndex }}</td>
-            <td>{{ row.assetEnd }}</td>
-            <td>{{ row.assetBegin }}</td>
-            <td class="item-col">{{ row.liabilityItem }}</td>
-            <td>{{ row.liabilityIndex }}</td>
-            <td>{{ row.liabilityEnd }}</td>
-            <td>{{ row.liabilityBegin }}</td>
+          <tr v-for="i in Math.max(assetList.length, liabilityList.length)" :key="i">
+            <td class="item-col">{{ assetList[i-1]?.item || '' }}</td>
+            <td>{{ assetList[i-1]?.index || '' }}</td>
+            <td>{{ assetList[i-1]?.end || '' }}</td>
+            <td>{{ assetList[i-1]?.begin || '' }}</td>
+            <td class="item-col">{{ liabilityList[i-1]?.item || '' }}</td>
+            <td>{{ liabilityList[i-1]?.index || '' }}</td>
+            <td>{{ liabilityList[i-1]?.end || '' }}</td>
+            <td>{{ liabilityList[i-1]?.begin || '' }}</td>
           </tr>
         </tbody>
       </table>
@@ -36,21 +36,22 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 interface BalanceRow {
-  assetItem: string;
-  assetIndex: number | string;
-  assetEnd: string | number;
-  assetBegin: string | number;
-  liabilityItem: string;
-  liabilityIndex: number | string;
-  liabilityEnd: string | number;
-  liabilityBegin: string | number;
+  item: string;
+  index: number | string;
+  end: string | number;
+  begin: string | number;
 }
 
-const balanceList = ref<BalanceRow[]>([]);
+const assetList = ref<BalanceRow[]>([]);
+const liabilityList = ref<BalanceRow[]>([]);
 
 onMounted(async () => {
   const res = await axios.get('/api/balance-sheet');
-  balanceList.value = res.data.list;
+  const all = res.data.list as BalanceRow[];
+  // 假设 index === '34' 为分界点
+  const splitIndex = all.findIndex(row => row.index === '34');
+  assetList.value = splitIndex === -1 ? all : all.slice(0, splitIndex);
+  liabilityList.value = splitIndex === -1 ? [] : all.slice(splitIndex);
 });
 </script>
 
