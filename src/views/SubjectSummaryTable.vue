@@ -118,7 +118,7 @@ const loadData = async () => {
     };
     const res = await axios.get('/api/sys/subject/list', { params });
     if (res.data.code === 200) {
-      const { list, totalCount: totalItems, pageSize: size, currPage, totalPage } = res.data.data;
+      const { list, totalCount: totalItems, pageSize: size, currPage } = res.data.data;
       subjectList.value = list;
       totalCount.value = totalItems;
       pageSize.value = size;
