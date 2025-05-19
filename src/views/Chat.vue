@@ -33,26 +33,29 @@
                   <template v-if="msg.text">
                     <div style="white-space: pre-wrap;">{{ msg.text }}</div>
                   </template>
-                  <template v-else-if="msg.voucher">
-                    <div>摘要：{{ msg.voucher.summary }}</div>
-                    <table class="voucher-table">
-                      <thead>
-                        <tr>
-                          <th>科目</th>
-                          <th>明细科目</th>
-                          <th>借方</th>
-                          <th>贷方</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(entry, i) in msg.voucher.entries" :key="i">
-                          <td>{{ entry.subject }}</td>
-                          <td>{{ entry.detailSubject }}</td>
-                          <td>{{ entry.debit }}</td>
-                          <td>{{ entry.credit }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <template v-else-if="msg.vouchers">
+                    <div v-for="(voucher, index) in msg.vouchers" :key="index" class="voucher-container">
+                      <div class="voucher-title">凭证 {{ index + 1 }}</div>
+                      <div>摘要：{{ voucher.summary }}</div>
+                      <table class="voucher-table">
+                        <thead>
+                          <tr>
+                            <th>科目</th>
+                            <th>明细科目</th>
+                            <th>借方</th>
+                            <th>贷方</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(entry, i) in voucher.entries" :key="i">
+                            <td>{{ entry.subject }}</td>
+                            <td>{{ entry.detailSubject }}</td>
+                            <td>{{ entry.debit }}</td>
+                            <td>{{ entry.credit }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </template>
                 </template>
               </div>
@@ -92,7 +95,7 @@
               :show-file-list="false"
               :on-change="handleFileChange"
               :before-remove="handleBeforeRemove"
-              :accept="'.png,.jpg,.jpeg,.bmp,.gif,.tiff,.webp,.pdf'"
+              :accept="'.png,.jpg,.jpeg,.bmp,.gif,.tiff,.webp,.pdf,.xlsx,.xls'"
               class="upload-btn"
             >
               <el-button 
@@ -144,6 +147,7 @@ interface VoucherEntry {
   debit: string;
   credit: string;
 }
+
 interface VoucherResponse {
   summary: string;
   entries: VoucherEntry[];
@@ -152,7 +156,7 @@ interface VoucherResponse {
 interface ChatMessage {
   role: 'user' | 'ai'
   text: string
-  voucher?: VoucherResponse
+  vouchers?: VoucherResponse[]
   image?: string
   imageType?: string
   fileName?: string
@@ -171,6 +175,10 @@ const previewFile = ref<{ name: string; raw: File; uid?: string } | null>(null)
 const previewUrl = ref('')
 const isImagePreview = computed(() => previewFile.value && previewFile.value.raw.type.startsWith('image/'))
 const isPdfPreview = computed(() => previewFile.value && previewFile.value.raw.type === 'application/pdf')
+const isExcelPreview = computed(() => previewFile.value && (
+  previewFile.value.raw.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+  previewFile.value.raw.type === 'application/vnd.ms-excel'
+))
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -186,10 +194,13 @@ const handleEnter = (e: KeyboardEvent) => {
 const handleFileChange = (file: UploadFile) => {
   if (file.raw) {
     const allowedTypes = [
-      'image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/gif', 'image/tiff', 'image/webp', 'application/pdf'
+      'image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/gif', 'image/tiff', 'image/webp',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel' // .xls
     ];
     if (!allowedTypes.includes(file.raw.type)) {
-      ElMessage.error('仅支持图片和PDF格式');
+      ElMessage.error('仅支持图片、PDF和Excel格式');
       return;
     }
     uploadedFiles.value = [{ name: file.raw.name, raw: file.raw, uid: String(file.uid) }];
@@ -243,8 +254,10 @@ const send = async () => {
     const response = await sendChatMessage(formData);
     if (typeof response === 'string') {
       messages.value.push({ role: 'ai', text: response });
+    } else if (Array.isArray(response)) {
+      messages.value.push({ role: 'ai', text: '', vouchers: response });
     } else if (response && response.entries) {
-      messages.value.push({ role: 'ai', text: '', voucher: response });
+      messages.value.push({ role: 'ai', text: '', vouchers: [response] });
     } else {
       messages.value.push({ role: 'ai', text: JSON.stringify(response) });
     }
@@ -295,6 +308,10 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
     previewUrl.value = URL.createObjectURL(file.raw)
   } else if (file.raw.type === 'application/pdf') {
     previewUrl.value = URL.createObjectURL(file.raw)
+  } else if (isExcelPreview.value) {
+    // Excel 文件预览提示
+    ElMessage.info('Excel文件暂不支持预览，请下载后查看')
+    return
   } else {
     previewUrl.value = ''
   }
@@ -539,16 +556,52 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
   }
 }
 
+.voucher-container {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.voucher-container:last-child {
+  margin-bottom: 0;
+}
+
+.voucher-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1746a2;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e3eaff;
+}
+
 .voucher-table {
   margin-top: 8px;
   border-collapse: collapse;
   width: 100%;
 }
+
 .voucher-table th, .voucher-table td {
   border: 1px solid #b6c6e3;
-  padding: 4px 8px;
+  padding: 8px 12px;
   text-align: center;
   font-size: 14px;
+}
+
+.voucher-table th {
+  background: #e3eaff;
+  color: #1746a2;
+  font-weight: 600;
+}
+
+.voucher-table td {
+  background: #fff;
+}
+
+.voucher-table tr:hover td {
+  background: #f0f4ff;
 }
 
 .user-message-bubble {
@@ -665,6 +718,12 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
   color: #409EFF;
   margin-right: 6px;
 }
+
+/* 添加 Excel 文件图标样式 */
+.chat-file-badge[data-type="excel"] .chat-file-icon {
+  color: #217346; /* Excel 绿色 */
+}
+
 .chat-file-name {
   font-size: 15px;
   color: #222e3a;

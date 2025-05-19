@@ -1,6 +1,28 @@
 <template>
   <div class="subject-summary-table-container">
-    <div class="table-wrapper">
+    <div class="filter-container">
+      <el-input
+        v-model="companyCode"
+        placeholder="请输入公司代码"
+        clearable
+        style="width: 200px"
+        @keyup.enter="handleSearch"
+      >
+        <template #prefix>
+          <el-icon><House /></el-icon>
+        </template>
+      </el-input>
+      <el-button type="primary" @click="handleSearch" :loading="loading">
+        <el-icon><Search /></el-icon>
+        查询
+      </el-button>
+      <el-button type="success" @click="handleExport" :loading="exporting">
+        <el-icon><Download /></el-icon>
+        导出
+      </el-button>
+    </div>
+
+    <div class="table-wrapper" v-if="!loading && !error">
       <table class="subject-summary-table">
         <thead>
           <tr>
@@ -15,51 +37,165 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in subjectList" :key="item.name">
-            <td class="subject-col">{{ item.name }}</td>
-            <td>{{ item.beginBalance }}</td>
-            <td>{{ item.currentDebit }}</td>
-            <td>{{ item.currentCredit }}</td>
-            <td>{{ item.endBalance }}</td>
-          </tr>
-          <tr class="total-row">
-            <td class="subject-col">合计</td>
-            <td>{{ total.beginBalance }}</td>
-            <td>{{ total.currentDebit }}</td>
-            <td>{{ total.currentCredit }}</td>
-            <td>{{ total.endBalance }}</td>
+          <tr v-for="item in subjectList" :key="item.id">
+            <td class="subject-col">{{ item.subjectName }}</td>
+            <td>{{ formatNumber(item.openingBalance) }}</td>
+            <td>{{ formatNumber(item.debit) }}</td>
+            <td>{{ formatNumber(item.credit) }}</td>
+            <td>{{ formatNumber(item.closingBalance) }}</td>
           </tr>
         </tbody>
       </table>
+    </div>
+    <el-empty v-if="!loading && !error && subjectList.length === 0" description="暂无数据" />
+    <el-skeleton v-if="loading" :rows="5" animated />
+    <el-alert v-if="error" :title="error" type="error" show-icon />
+    
+    <div class="pagination-container" v-if="!loading && !error && subjectList.length > 0">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="totalCount"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { Download, Search, House } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import axios from 'axios';
 
 interface SubjectSummaryRow {
-  name: string;
-  beginBalance: string | number;
-  currentDebit: string | number;
-  currentCredit: string | number;
-  endBalance: string | number;
+  id: number;
+  subjectCode: string;
+  subjectName: string;
+  openingBalance: number;
+  debit: number;
+  credit: number;
+  closingBalance: number;
 }
 
 const subjectList = ref<SubjectSummaryRow[]>([]);
-const total = ref<SubjectSummaryRow>({
-  name: '合计',
-  beginBalance: '',
-  currentDebit: '',
-  currentCredit: '',
-  endBalance: '',
-});
+const loading = ref(true);
+const error = ref('');
+const exporting = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalCount = ref(0);
+const companyCode = ref('01');
 
-onMounted(async () => {
-  const res = await axios.get('/api/subject-summary');
-  subjectList.value = res.data.list;
-  total.value = res.data.total;
+
+
+const formatNumber = (value: number) => {
+  if (value === null || value === undefined) return '0.00';
+  return value.toFixed(2);
+};
+
+const handleSearch = () => {
+  currentPage.value = 1; // 重置到第一页
+  loadData();
+};
+
+const loadData = async () => {
+  if (!companyCode.value) {
+    ElMessage.warning('请输入公司代码');
+    return;
+  }
+  
+  loading.value = true;
+  error.value = '';
+  try {
+    const params = {
+      page: currentPage.value,
+      limit: pageSize.value,
+      companyCode: companyCode.value
+    };
+    const res = await axios.get('/api/sys/subject/list', { params });
+    if (res.data.code === 200) {
+      const { list, totalCount: totalItems, pageSize: size, currPage, totalPage } = res.data.data;
+      subjectList.value = list;
+      totalCount.value = totalItems;
+      pageSize.value = size;
+      currentPage.value = currPage;
+    } else {
+      throw new Error(res.data.msg || '获取数据失败');
+    }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    subjectList.value = [];
+    totalCount.value = 0;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleSizeChange = (val: number) => {
+  pageSize.value = val;
+  currentPage.value = 1;
+  loadData();
+};
+
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val;
+  loadData();
+};
+
+const handleExport = async () => {
+  if (exporting.value) return;
+  if (!companyCode.value) {
+    ElMessage.warning('请输入公司代码');
+    return;
+  }
+  
+  exporting.value = true;
+  try {
+    const params = {
+      companyCode: companyCode.value
+    };
+    
+    const response = await axios.get('/api/sys/subject/export', {
+      params,
+      responseType: 'blob'
+    });
+    
+    // 创建下载链接
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // 设置文件名
+    const date = new Date();
+    const fileName = `科目汇总表_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.xlsx`;
+    link.download = fileName;
+    
+    // 触发下载
+    document.body.appendChild(link);
+    link.click();
+    
+    // 清理
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    ElMessage.success('导出成功');
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e instanceof Error ? e.message : String(e)));
+  } finally {
+    exporting.value = false;
+  }
+};
+
+// 恢复 onMounted 钩子，以便首次加载数据
+onMounted(() => {
+  loadData();
 });
 </script>
 
@@ -72,6 +208,19 @@ onMounted(async () => {
   padding: 0;
   background: #f8fafc;
 }
+
+.filter-container {
+  margin-bottom: 20px;
+  padding: 0 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  height: 60px;
+}
+
 .table-wrapper {
   flex: 1 1 auto;
   min-height: 0;
@@ -132,9 +281,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .total-row {
-  font-weight: bold;
-  color: #fff;
-  background: #2563eb;
+  display: none;
 }
 @media (max-width: 900px) {
   .subject-summary-table th, .subject-summary-table td {
@@ -148,5 +295,28 @@ onMounted(async () => {
   .subject-summary-table {
     min-width: 700px;
   }
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 20px;
+}
+
+:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #b6c6e3 inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+:deep(.el-input__prefix) {
+  color: #1746a2;
 }
 </style> 
