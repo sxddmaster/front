@@ -6,13 +6,13 @@
           <tr>
             <th class="item-col">项目</th>
             <th>行次</th>
-            <th>本期金额</th>
-            <th>上期金额</th>
+            <th>本月金额</th>
+            <th>本年累计金额</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in profitList" :key="row.index" :class="{ highlight: row.highlight }">
-            <td class="item-col" :style="{ fontWeight: row.bold ? 'bold' : 'normal' }">{{ row.item }}</td>
+          <tr v-for="row in profitList" :key="row.index">
+            <td class="item-col">{{ row.item }}</td>
             <td>{{ row.index }}</td>
             <td>{{ row.currentAmount }}</td>
             <td>{{ row.lastAmount }}</td>
@@ -32,8 +32,6 @@ interface ProfitRow {
   index: number | string;
   currentAmount: string | number;
   lastAmount: string | number;
-  bold?: boolean;
-  highlight?: boolean;
 }
 
 const profitList = ref<ProfitRow[]>([]);
@@ -93,8 +91,5 @@ onMounted(async () => {
   text-align: left;
   padding-left: 18px;
   min-width: 200px;
-}
-.highlight {
-  background: #fff9c4;
 }
 </style> 

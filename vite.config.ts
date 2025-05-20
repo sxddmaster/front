@@ -6,7 +6,7 @@ import path from 'path'
 export default defineConfig({
   
   // 设置打包后部署的基础路径（根路径为 '/'，子路径如 '/myapp/'）
-  base: '/',
+  base: '/myapp',
   
   plugins: [vue()],
 

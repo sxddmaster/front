@@ -12,9 +12,9 @@ const app = createApp(App)
 app.use(ElementPlus)
 
 const routes = [
-  { path: '/', name: 'home', component: Home },
-  { path: '/chat', name: 'chat', component: Chat },
-  { path: '/table', name: 'table', component: DataTable },
+  { path: '/myapp', name: 'home', component: Home },
+  { path: '/myapp/chat', name: 'chat', component: Chat },
+  { path: '/myapp/table', name: 'table', component: DataTable },
 ]
 const router = createRouter({
   history: createWebHistory(),
