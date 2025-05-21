@@ -30,20 +30,57 @@
             <th rowspan="2">期初余额</th>
             <th colspan="2">本期发生额</th>
             <th rowspan="2">期末余额</th>
+            <th style="width: 40px"></th>
           </tr>
           <tr>
             <th>借方</th>
             <th>贷方</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in subjectList" :key="item.id">
-            <td class="subject-col">{{ item.subjectName }}</td>
-            <td>{{ formatNumber(item.openingBalance) }}</td>
-            <td>{{ formatNumber(item.debit) }}</td>
-            <td>{{ formatNumber(item.credit) }}</td>
-            <td>{{ formatNumber(item.closingBalance) }}</td>
-          </tr>
+          <template v-for="item in subjectList" :key="item.id">
+            <tr>
+              <td class="subject-col">{{ item.subjectName }}</td>
+              <td>{{ formatNumber(item.openingBalance) }}</td>
+              <td>{{ formatNumber(item.debit) }}</td>
+              <td>{{ formatNumber(item.credit) }}</td>
+              <td>{{ formatNumber(item.closingBalance) }}</td>
+              <td>
+                <el-button
+                  type="text"
+                  size="small"
+                  @click="toggleRow(item.id)"
+                  v-if="item.list && item.list.length"
+                >
+                  <el-icon>
+                    <ArrowDown v-if="!expandedRows.has(item.id)" />
+                    <ArrowUp v-else />
+                  </el-icon>
+                </el-button>
+              </td>
+            </tr>
+            <tr v-if="expandedRows.has(item.id)">
+              <td colspan="6" style="padding:0;">
+                <table class="nested-table">
+                  <thead>
+                    <tr>
+                      <th>二级科目名称</th>
+                      <th>借方</th>
+                      <th>贷方</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="sub in item.list" :key="sub.itemName">
+                      <td>{{ sub.itemName }}</td>
+                      <td>{{ formatNumber(sub.debit) }}</td>
+                      <td>{{ formatNumber(sub.credit) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -67,7 +104,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Download, Search, House } from '@element-plus/icons-vue';
+import { Download, Search, House, ArrowDown, ArrowUp } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import axios from 'axios';
 
@@ -79,6 +116,7 @@ interface SubjectSummaryRow {
   debit: number;
   credit: number;
   closingBalance: number;
+  list?: { itemName: string; debit: number; credit: number }[];
 }
 
 const subjectList = ref<SubjectSummaryRow[]>([]);
@@ -89,8 +127,7 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 const totalCount = ref(0);
 const companyCode = ref('01');
-
-
+const expandedRows = ref<Set<number>>(new Set());
 
 const formatNumber = (value: number) => {
   if (value === null || value === undefined) return '0.00';
@@ -190,6 +227,14 @@ const handleExport = async () => {
     ElMessage.error('导出失败：' + (e instanceof Error ? e.message : String(e)));
   } finally {
     exporting.value = false;
+  }
+};
+
+const toggleRow = (id: number) => {
+  if (expandedRows.value.has(id)) {
+    expandedRows.value.delete(id);
+  } else {
+    expandedRows.value.add(id);
   }
 };
 
@@ -318,5 +363,19 @@ onMounted(() => {
 
 :deep(.el-input__prefix) {
   color: #1746a2;
+}
+
+.nested-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #f6f8fa;
+  margin: 0;
+}
+.nested-table th, .nested-table td {
+  border: 1px solid #b6c6e3;
+  text-align: center;
+  padding: 6px 8px;
+  font-size: 14px;
+  color: #333;
 }
 </style> 
