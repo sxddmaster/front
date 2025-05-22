@@ -15,15 +15,25 @@
           </tr>
         </thead>
         <tbody>
+          <tr class="fixed-row">
+            <td class="item-col blue-bold">流动资产：</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="item-col blue-bold">流动负债：</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
           <tr v-for="i in Math.max(assetList.length, liabilityList.length)" :key="i">
-            <td class="item-col">{{ assetList[i-1]?.item || '' }}</td>
-            <td>{{ assetList[i-1]?.index || '' }}</td>
-            <td>{{ assetList[i-1]?.end || '' }}</td>
-            <td>{{ assetList[i-1]?.begin || '' }}</td>
-            <td class="item-col">{{ liabilityList[i-1]?.item || '' }}</td>
-            <td>{{ liabilityList[i-1]?.index || '' }}</td>
-            <td>{{ liabilityList[i-1]?.end || '' }}</td>
-            <td>{{ liabilityList[i-1]?.begin || '' }}</td>
+            <td class="item-col">{{ assetList[i-1]?.itemName || '' }}</td>
+            <td>{{ assetList[i-1]?.itemNo ?? '' }}</td>
+            <td>{{ assetList[i-1] ? displayBalance(assetList[i-1], 'closingBalance') : '' }}</td>
+            <td>{{ assetList[i-1] ? displayBalance(assetList[i-1], 'openingBalance') : '' }}</td>
+            <td class="item-col">{{ liabilityList[i-1]?.itemName || '' }}</td>
+            <td>{{ liabilityList[i-1]?.itemNo ?? '' }}</td>
+            <td>{{ liabilityList[i-1] ? displayBalance(liabilityList[i-1], 'closingBalance') : '' }}</td>
+            <td>{{ liabilityList[i-1] ? displayBalance(liabilityList[i-1], 'openingBalance') : '' }}</td>
           </tr>
         </tbody>
       </table>
@@ -36,20 +46,29 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 interface BalanceRow {
-  item: string;
-  index: number | string;
-  end: string | number;
-  begin: string | number;
+  itemName: string;
+  itemNo: number;
+  closingBalance: number;
+  openingBalance: number;
 }
 
 const assetList = ref<BalanceRow[]>([]);
 const liabilityList = ref<BalanceRow[]>([]);
+const companyCode = ref('01');
+
+function displayBalance(row: BalanceRow, key: 'closingBalance' | 'openingBalance') {
+  if (row.closingBalance === 0 && row.openingBalance === 0) {
+    return '--';
+  }
+  return row[key];
+}
 
 onMounted(async () => {
-  const res = await axios.get('/api/balance-sheet');
-  const all = res.data.list as BalanceRow[];
-  // 假设 index === '34' 为分界点
-  const splitIndex = all.findIndex(row => row.index === '34');
+  const params = { companyCode: companyCode.value };
+  const res = await axios.get('/api/sys/balance-sheet/list', { params });
+  const all = res.data.data as BalanceRow[];
+  // itemNo === 31 为分界点
+  const splitIndex = all.findIndex(row => row.itemNo === 31);
   assetList.value = splitIndex === -1 ? all : all.slice(0, splitIndex);
   liabilityList.value = splitIndex === -1 ? [] : all.slice(splitIndex);
 });
@@ -105,4 +124,8 @@ onMounted(async () => {
   padding-left: 18px;
   min-width: 160px;
 }
-</style> 
+.fixed-row .blue-bold {
+  color: #0033cc;
+  font-weight: bold;
+}
+</style>
