@@ -48,7 +48,7 @@
               <td>{{ formatNumber(item.closingBalance) }}</td>
               <td>
                 <el-button
-                  type="text"
+                  type="link"
                   size="small"
                   @click="toggleRow(item.id)"
                   v-if="item.list && item.list.length"
@@ -378,4 +378,5 @@ onMounted(() => {
   font-size: 14px;
   color: #333;
 }
+
 </style> 
