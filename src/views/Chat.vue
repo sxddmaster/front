@@ -135,8 +135,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed } from 'vue'
-import { User, Service, Position, Plus, PictureFilled, Close } from '@element-plus/icons-vue'
+import { ref, nextTick, computed } from 'vue'
+import { User, Service, Position, PictureFilled, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendChatMessage } from '../api/chat'
 import type { UploadFile, UploadInstance } from 'element-plus'
@@ -187,7 +187,7 @@ const scrollToBottom = async () => {
   }
 }
 
-const handleEnter = (e: KeyboardEvent) => {
+const handleEnter = () => {
   send()
 }
 
