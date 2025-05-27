@@ -1,25 +1,26 @@
 <template>
   <div class="profit-table-container">
-    <div class="filter-container">
-      <el-input
-        v-model="companyCode"
-        placeholder="请输入公司代码"
-        clearable
-        style="width: 200px"
-        @keyup.enter="handleSearch"
-      >
-        <template #prefix>
-          <el-icon><House /></el-icon>
-        </template>
-      </el-input>
-      <el-button type="primary" @click="handleSearch" :loading="loading">
-        <el-icon><Search /></el-icon>
-        查询
-      </el-button>
-      <el-button type="success" @click="handleExport" :loading="exporting">
-        <el-icon><Download /></el-icon>
-        导出
-      </el-button>
+    <div class="filter-bar">
+      <div class="filter-actions">
+        <el-date-picker
+          v-model="date"
+          type="month"
+          placeholder="请选择月份"
+          format="YYYY-MM"
+          value-format="YYYY-MM"
+          :clearable="true"
+          style="width: 200px;"
+        />
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon>
+          查询
+        </el-button>
+        <el-button type="success" @click="handleExport" :loading="exporting">
+          <el-icon><Download /></el-icon>
+          导出
+        </el-button>
+      </div>
+      <span v-if="companyName" class="company-name-label">公司：{{ companyName }}</span>
     </div>
     <div class="table-wrapper">
       <table class="profit-table">
@@ -60,6 +61,8 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import { Download, House, Search } from '@element-plus/icons-vue';
+import { ElSelect, ElOption } from 'element-plus';
+import { useCompanyStore } from '../store/companyStore';
 
 interface ProfitRow {
   itemName: string;
@@ -68,13 +71,27 @@ interface ProfitRow {
   totalAmount: number;
 }
 
+interface CompanyOption {
+  companyCode: string;
+  companyName: string;
+  companyType: number;
+}
+
 const profitList = ref<ProfitRow[]>([]);
-const companyCode = ref('01');
 const currPage = ref(1);
 const pageSize = ref(10);
 const totalCount = ref(0);
 const exporting = ref(false);
 const loading = ref(true);
+const companyList = ref<CompanyOption[]>([]);
+const companyStore = useCompanyStore();
+const companyName = ref('');
+
+function getDefaultDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+}
+const date = ref<string>(getDefaultDate());
 
 const formatNumber = (val: number) => {
   if (val === null || val === undefined) return '--';
@@ -88,15 +105,16 @@ const handleSearch = () => {
 };
 
 const loadData = async () => {
-  if (!companyCode.value) {
+  if (!companyStore.companyCode) {
     ElMessage.warning('请输入公司代码');
     return;
   }
   loading.value = true;
   const params = {
-    companyCode: companyCode.value,
+    companyCode: companyStore.companyCode,
     page: currPage.value,
-    limit: pageSize.value
+    limit: pageSize.value,
+    date: date.value || undefined
   };
   const res = await axios.get('/api/sys/profit/list', { params });
   if (res.data && res.data.data) {
@@ -121,13 +139,16 @@ const handleCurrentChange = (val: number) => {
 
 const handleExport = async () => {
   if (exporting.value) return;
-  if (!companyCode.value) {
+  if (!companyStore.companyCode) {
     ElMessage.warning('请输入公司代码');
     return;
   }
   exporting.value = true;
   try {
-    const params = { companyCode: companyCode.value };
+    const params = { 
+      companyCode: companyStore.companyCode,
+      date: date.value || undefined
+     };
     const response = await axios.get('/api/sys/profit/export', {
       params,
       responseType: 'blob'
@@ -138,8 +159,8 @@ const handleExport = async () => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const date = new Date();
-    const fileName = `利润表_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.xlsx`;
+    const now = new Date();
+    const fileName = `利润表_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}.xlsx`;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -154,6 +175,13 @@ const handleExport = async () => {
 };
 
 onMounted(() => {
+  // 获取公司名称
+  axios.get('/api/sys/company/list').then(res => {
+    if (res.data && res.data.data) {
+      const found = res.data.data.find((item: any) => item.companyCode === companyStore.companyCode);
+      if (found) companyName.value = found.companyName;
+    }
+  });
   loadData();
 });
 </script>
@@ -214,15 +242,30 @@ onMounted(() => {
   justify-content: flex-end;
   padding: 0 20px;
 }
-.filter-container {
-  margin-bottom: 20px;
-  padding: 0 20px;
+.filter-bar {
   display: flex;
-  gap: 12px;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  margin-bottom: 20px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   height: 60px;
 }
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.company-name-label {
+  font-size: 1.08rem;
+  color: #1746a2;
+  font-weight: 600;
+  background: #f0f9eb;
+  border-radius: 8px;
+  padding: 6px 18px;
+  box-shadow: 0 2px 8px rgba(64,158,255,0.06);
+}
+.filter-container, .company-name-bar { display: none; }
 </style> 

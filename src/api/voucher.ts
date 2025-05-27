@@ -15,13 +15,11 @@ export interface VoucherRow {
 export interface PageParams {
   page: number;
   limit: number;
-  startTime?: string;
-  endTime?: string;
+  date?: string;
 }
 
 export interface ExportParams {
-  startTime?: string;
-  endTime?: string;
+  date?: string;
   companyCode: string;
 }
 

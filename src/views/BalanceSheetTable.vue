@@ -1,5 +1,27 @@
 <template>
   <div class="balance-sheet-table-container">
+    <div class="filter-bar">
+      <div class="filter-actions">
+        <el-date-picker
+          v-model="date"
+          type="month"
+          placeholder="请选择月份"
+          format="YYYY-MM"
+          value-format="YYYY-MM"
+          :clearable="true"
+          style="width: 200px;"
+        />
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon>
+          查询
+        </el-button>
+        <el-button type="success" @click="handleExport" :loading="exporting">
+          <el-icon><Download /></el-icon>
+          导出
+        </el-button>
+      </div>
+      <span v-if="companyName" class="company-name-label">公司：{{ companyName }}</span>
+    </div>
     <div class="table-wrapper">
       <table class="balance-sheet-table">
         <thead>
@@ -44,6 +66,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { ElMessage } from 'element-plus';
+import { Download, House, Search } from '@element-plus/icons-vue';
+import { ElSelect, ElOption } from 'element-plus';
+import { useCompanyStore } from '../store/companyStore';
 
 interface BalanceRow {
   itemName: string;
@@ -52,9 +78,25 @@ interface BalanceRow {
   openingBalance: number;
 }
 
+interface CompanyOption {
+  companyCode: string;
+  companyName: string;
+  companyType: number;
+}
+
 const assetList = ref<BalanceRow[]>([]);
 const liabilityList = ref<BalanceRow[]>([]);
-const companyCode = ref('01');
+const loading = ref(true);
+const exporting = ref(false);
+const companyList = ref<CompanyOption[]>([]);
+const companyStore = useCompanyStore();
+const companyName = ref('');
+
+function getDefaultDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+}
+const date = ref<string>(getDefaultDate());
 
 function displayBalance(row: BalanceRow, key: 'closingBalance' | 'openingBalance') {
   if (row.closingBalance === 0 && row.openingBalance === 0) {
@@ -63,14 +105,69 @@ function displayBalance(row: BalanceRow, key: 'closingBalance' | 'openingBalance
   return row[key];
 }
 
-onMounted(async () => {
-  const params = { companyCode: companyCode.value };
+const handleSearch = () => {
+  loadData();
+};
+
+const loadData = async () => {
+  if (!companyStore.companyCode) {
+    ElMessage.warning('请输入公司代码');
+    return;
+  }
+  loading.value = true;
+  const params = { companyCode: companyStore.companyCode, date: date.value || undefined };
   const res = await axios.get('/api/sys/balance-sheet/list', { params });
   const all = res.data.data as BalanceRow[];
   // itemNo === 31 为分界点
   const splitIndex = all.findIndex(row => row.itemNo === 31);
   assetList.value = splitIndex === -1 ? all : all.slice(0, splitIndex);
   liabilityList.value = splitIndex === -1 ? [] : all.slice(splitIndex);
+  loading.value = false;
+};
+
+const handleExport = async () => {
+  if (exporting.value) return;
+  if (!companyStore.companyCode) {
+    ElMessage.warning('请输入公司代码');
+    return;
+  }
+  exporting.value = true;
+  try {
+    const params = { companyCode: companyStore.companyCode, date: date.value || undefined };
+    const response = await axios.get('/api/sys/balance-sheet/export', {
+      params,
+      responseType: 'blob'
+    });
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const now = new Date();
+    const fileName = `资产负债表_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}.xlsx`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    ElMessage.success('导出成功');
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e instanceof Error ? e.message : String(e)));
+  } finally {
+    exporting.value = false;
+  }
+};
+
+onMounted(() => {
+  // 获取公司名称
+  axios.get('/api/sys/company/list').then(res => {
+    if (res.data && res.data.data) {
+      const found = res.data.data.find((item: any) => item.companyCode === companyStore.companyCode);
+      if (found) companyName.value = found.companyName;
+    }
+  });
+  loadData();
 });
 </script>
 
@@ -128,4 +225,30 @@ onMounted(async () => {
   color: #0033cc;
   font-weight: bold;
 }
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  margin-bottom: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  height: 60px;
+}
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.company-name-label {
+  font-size: 1.08rem;
+  color: #1746a2;
+  font-weight: 600;
+  background: #f0f9eb;
+  border-radius: 8px;
+  padding: 6px 18px;
+  box-shadow: 0 2px 8px rgba(64,158,255,0.06);
+}
+.filter-container, .company-name-bar { display: none; }
 </style>

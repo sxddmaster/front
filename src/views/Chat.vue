@@ -140,6 +140,7 @@ import { User, Service, Position, PictureFilled, Close } from '@element-plus/ico
 import { ElMessage } from 'element-plus'
 import { sendChatMessage } from '../api/chat'
 import type { UploadFile, UploadInstance } from 'element-plus'
+import { useCompanyStore } from '../store/companyStore'
 
 interface VoucherEntry {
   subject: string;
@@ -179,6 +180,8 @@ const isExcelPreview = computed(() => previewFile.value && (
   previewFile.value.raw.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
   previewFile.value.raw.type === 'application/vnd.ms-excel'
 ))
+
+const companyStore = useCompanyStore()
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -251,7 +254,7 @@ const send = async () => {
     if (uploadedFiles.value.length > 0) {
       formData.append('file', uploadedFiles.value[0].raw);
     }
-    const response = await sendChatMessage(formData);
+    const response = await sendChatMessage(formData, companyStore.companyCode);
     if (typeof response === 'string') {
       messages.value.push({ role: 'ai', text: response });
     } else if (Array.isArray(response)) {

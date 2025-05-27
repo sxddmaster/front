@@ -11,7 +11,10 @@ export interface VoucherResponse {
   entries: VoucherEntry[];
 }
 
-export const sendChatMessage = async (formData: FormData): Promise<VoucherResponse> => {
+export const sendChatMessage = async (formData: FormData, companyCode?: string): Promise<VoucherResponse> => {
+  if (companyCode) {
+    formData.append('companyCode', companyCode);
+  }
   const response = await axios.post<VoucherResponse>('http://localhost:8081/api/open-ai/send', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });

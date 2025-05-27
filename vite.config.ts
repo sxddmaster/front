@@ -6,7 +6,7 @@ import path from 'path'
 export default defineConfig({
   
   // 设置打包后部署的基础路径（根路径为 '/'，子路径如 '/myapp/'）
-  base: '/myapp',
+  base: '/myapp/',
   
   plugins: [vue()],
 
@@ -20,9 +20,9 @@ export default defineConfig({
   },
 
   server: {
-    port: 3001,             // 开发服务器端口
+    port: 9000,             // 开发服务器端口
     open: true,             // 启动后自动打开浏览器
-    cors: true,             // 是否开启跨域
+
     
     proxy: {
       '/api': 'http://localhost:8082'

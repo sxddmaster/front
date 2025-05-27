@@ -1,24 +1,26 @@
 <template>
   <div class="voucher-table-container">
-    <div class="filter-container">
-      <el-date-picker
-        v-model="dateRange"
-        type="daterange"
-        range-separator="至"
-        start-placeholder="开始日期"
-        end-placeholder="结束日期"
-        format="YYYY-MM-DD"
-        value-format="YYYY-MM-DD"
-        :clearable="true"
-      />
-      <el-button type="primary" @click="handleSearch" :loading="loading">
-        <el-icon><Search /></el-icon>
-        查询
-      </el-button>
-      <el-button type="success" @click="handleExport" :loading="exporting">
-        <el-icon><Download /></el-icon>
-        导出
-      </el-button>
+    <div class="filter-bar">
+      <div class="filter-actions">
+        <el-date-picker
+          v-model="date"
+          type="month"
+          placeholder="请选择月份"
+          format="YYYY-MM"
+          value-format="YYYY-MM"
+          :clearable="true"
+          style="width: 200px;"
+        />
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon>
+          查询
+        </el-button>
+        <el-button type="success" @click="handleExport" :loading="exporting">
+          <el-icon><Download /></el-icon>
+          导出
+        </el-button>
+      </div>
+      <span v-if="companyName" class="company-name-label">公司：{{ companyName }}</span>
     </div>
 
     <div class="table-wrapper" v-if="!loading && !error">
@@ -69,6 +71,8 @@ import { Search, Download } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { fetchVoucherList, exportVoucherList } from '../api/voucher';
 import type { VoucherRow } from '../api/voucher';
+import axios from 'axios';
+import { useCompanyStore } from '../store/companyStore';
 
 const tableData = ref<VoucherRow[]>([]);
 const loading = ref(true);
@@ -76,8 +80,18 @@ const error = ref('');
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalCount = ref(0);
-const dateRange = ref<[string, string] | null>(null);
+
+// 先定义获取默认月份的函数
+function getDefaultDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+}
+// 再声明 date，并直接初始化
+const date = ref<string>(getDefaultDate());
 const exporting = ref(false);
+
+const companyStore = useCompanyStore();
+const companyName = ref('');
 
 const loadData = async () => {
   loading.value = true;
@@ -86,8 +100,8 @@ const loadData = async () => {
     const params = {
       page: currentPage.value,
       limit: pageSize.value,
-      startTime: dateRange.value?.[0] || undefined,
-      endTime: dateRange.value?.[1] || undefined
+      date: date.value || undefined,
+      companyCode: companyStore.companyCode || ''
     };
     const res = await fetchVoucherList(params);
     if (res.data.code === 200) {
@@ -127,9 +141,8 @@ const handleExport = async () => {
   exporting.value = true;
   try {
     const params = {
-      startTime: dateRange.value?.[0] || undefined,
-      endTime: dateRange.value?.[1] || undefined,
-      companyCode: ''
+      date: date.value || undefined,
+      companyCode: companyStore.companyCode || ''
     };
     
     const response = await exportVoucherList(params);
@@ -143,8 +156,8 @@ const handleExport = async () => {
     link.href = url;
     
     // 设置文件名（确保使用 .xlsx 扩展名）
-    const date = new Date();
-    const fileName = `凭证列表_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.xlsx`;
+    const now = new Date();
+    const fileName = `凭证列表_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}.xlsx`;
     link.download = fileName;
     
     // 触发下载
@@ -164,6 +177,13 @@ const handleExport = async () => {
 };
 
 onMounted(() => {
+  // 获取公司名称
+  axios.get('/api/sys/company/list').then(res => {
+    if (res.data && res.data.data) {
+      const found = res.data.data.find((item: any) => item.companyCode === companyStore.companyCode);
+      if (found) companyName.value = found.companyName;
+    }
+  });
   loadData();
 });
 </script>
@@ -178,18 +198,40 @@ onMounted(() => {
   background: #f8fafc;
 }
 
-.filter-container {
-  margin-bottom: 20px;
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
+  margin-bottom: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  height: 60px;
+}
+
+.filter-actions {
   display: flex;
   gap: 12px;
   align-items: center;
 }
 
+.company-name-label {
+  font-size: 1.08rem;
+  color: #1746a2;
+  font-weight: 600;
+  background: #f0f9eb;
+  border-radius: 8px;
+  padding: 6px 18px;
+  box-shadow: 0 2px 8px rgba(64,158,255,0.06);
+}
+
+.filter-container, .company-name-bar { display: none; }
+
 .table-wrapper {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: calc(100vh - 200px);
+  max-height: 60vh;
   overflow-y: auto;
   overflow-x: auto;
   background: #fff;
@@ -220,9 +262,6 @@ onMounted(() => {
   justify-content: flex-end;
   padding: 0 20px;
   background: #fff;
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
 }
 
 :deep(.el-table) {
@@ -245,7 +284,7 @@ onMounted(() => {
 
 @media (max-width: 900px) {
   .table-wrapper {
-    max-height: calc(100vh - 180px);
+    max-height: 40vh;
   }
   
   :deep(.el-table th),
