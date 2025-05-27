@@ -63,8 +63,8 @@
           </div>
         </div>
         <div v-if="!messages.length" class="welcome-message">
-          <h2>欢迎使用 AI 助手</h2>
-          <p>开始对话吧，我会尽力帮助你</p>
+          <h2>欢迎记账凭证助手</h2>
+          <p>开始对话吧，请上传原始凭证</p>
         </div>
       </div>
       

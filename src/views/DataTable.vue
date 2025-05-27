@@ -6,7 +6,7 @@
           <el-menu-item index="voucher">记账凭证</el-menu-item>
           <el-menu-item index="subjectSummary">科目汇总表</el-menu-item>
           <!-- <el-menu-item index="equityChange">所有者权益变动表</el-menu-item> -->
-          <el-menu-item index="cashFlow">现金流量表</el-menu-item>
+          <!-- <el-menu-item index="cashFlow">现金流量表</el-menu-item> -->
           <el-menu-item index="profit">利润表</el-menu-item>
           <el-menu-item index="balanceSheet">资产负债表</el-menu-item>
         </el-menu>
