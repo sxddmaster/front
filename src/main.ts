@@ -14,7 +14,7 @@ const app = createApp(App)
 app.use(ElementPlus)
 
 const routes = [
-  { path: '/myapp', name: 'home', component: Home },
+  { path: '/', name: 'home', component: Home },
   { path: '/myapp/chat', name: 'chat', component: Chat },
   { path: '/myapp/table', name: 'table', component: DataTable },
   { path: '/myapp/company-list', name: 'company-list', component: CompanyList },

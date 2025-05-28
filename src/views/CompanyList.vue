@@ -84,7 +84,7 @@ const editForm = reactive<CompanyOption>({
 });
 
 const fetchCompanyList = async () => {
-  const res = await axios.get('http://192.168.99.170:8082/api/sys/company/list');
+  const res = await axios.get('http://localhost:8082/api/sys/company/list');
   if (res.data && res.data.data) {
     companyList.value = res.data.data;
   }
@@ -114,10 +114,10 @@ const handleSave = async () => {
     return;
   }
   if (dialogMode.value === 'add') {
-    await axios.post('http://192.168.99.170:8082/api/sys/company/save', editForm);
+    await axios.post('http://localhost:8082/api/sys/company/save', editForm);
     ElMessage.success('新增成功');
   } else {
-    await axios.post('http://192.168.99.170:8082/api/sys/company/update', editForm);
+    await axios.post('http://localhost:8082/api/sys/company/update', editForm);
     ElMessage.success('修改成功');
   }
   dialogVisible.value = false;
@@ -127,7 +127,7 @@ const handleSave = async () => {
 const handleDelete = (row: CompanyOption) => {
   ElMessageBox.confirm('确定要删除该公司吗？', '提示', { type: 'warning' })
     .then(async () => {
-      await axios.post('http://192.168.99.170:8082/api/sys/company/delete', [row.id]);
+      await axios.post('http://localhost:8082/api/sys/company/delete', [row.id]);
       ElMessage.success('删除成功');
       fetchCompanyList();
     })
@@ -139,7 +139,7 @@ const handleBatchDelete = () => {
   ElMessageBox.confirm('确定要批量删除选中的公司吗？', '提示', { type: 'warning' })
     .then(async () => {
       const ids = multipleSelection.value.map(item => item.id);
-      await axios.post('http://192.168.99.170:8082/api/sys/company/delete', ids);
+      await axios.post('http://localhost:8082/api/sys/company/delete', ids);
       ElMessage.success('批量删除成功');
       fetchCompanyList();
       if (tableRef.value) tableRef.value.clearSelection();
