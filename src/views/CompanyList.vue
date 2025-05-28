@@ -35,8 +35,8 @@
     <!-- 新增/编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="dialogMode === 'add' ? '新增公司' : '编辑公司'">
       <el-form :model="editForm" label-width="90px" style="max-width: 400px; margin: 0 auto;">
-        <el-form-item label="公司代码">
-          <el-input v-model="editForm.companyCode" :disabled="dialogMode === 'edit'" />
+        <el-form-item v-if="dialogMode === 'edit'" label="公司代码">
+          <el-input v-model="editForm.companyCode" disabled />
         </el-form-item>
         <el-form-item label="公司名称">
           <el-input v-model="editForm.companyName" />
@@ -64,7 +64,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 
 interface CompanyOption {
   id?: number;
-  companyCode: string;
+  companyCode?: string;
   companyName: string;
   companyType: number;
 }
@@ -78,13 +78,12 @@ const dialogVisible = ref(false);
 const dialogMode = ref<'add' | 'edit'>('add');
 const editForm = reactive<CompanyOption>({
   id: undefined,
-  companyCode: '',
   companyName: '',
   companyType: 0
 });
 
 const fetchCompanyList = async () => {
-  const res = await axios.get('http://localhost:8082/api/sys/company/list');
+  const res = await axios.get('http://192.168.99.170:8082/api/sys/company/list');
   if (res.data && res.data.data) {
     companyList.value = res.data.data;
   }
@@ -93,7 +92,7 @@ const fetchCompanyList = async () => {
 const openAddDialog = () => {
   dialogMode.value = 'add';
   editForm.id = undefined;
-  editForm.companyCode = '';
+  delete editForm.companyCode;
   editForm.companyName = '';
   editForm.companyType = 0;
   dialogVisible.value = true;
@@ -109,15 +108,16 @@ const openEditDialog = (row: CompanyOption) => {
 };
 
 const handleSave = async () => {
-  if (!editForm.companyCode || !editForm.companyName) {
-    ElMessage.warning('公司代码和公司名称不能为空');
+  if (!editForm.companyName) {
+    ElMessage.warning('公司名称不能为空');
     return;
   }
   if (dialogMode.value === 'add') {
-    await axios.post('http://localhost:8082/api/sys/company/save', editForm);
+    const { companyName, companyType } = editForm;
+    await axios.post('http://192.168.99.170:8082/api/sys/company/save', { companyName, companyType });
     ElMessage.success('新增成功');
   } else {
-    await axios.post('http://localhost:8082/api/sys/company/update', editForm);
+    await axios.post('http://192.168.99.170:8082/api/sys/company/update', editForm);
     ElMessage.success('修改成功');
   }
   dialogVisible.value = false;
@@ -127,7 +127,7 @@ const handleSave = async () => {
 const handleDelete = (row: CompanyOption) => {
   ElMessageBox.confirm('确定要删除该公司吗？', '提示', { type: 'warning' })
     .then(async () => {
-      await axios.post('http://localhost:8082/api/sys/company/delete', [row.id]);
+      await axios.post('http://192.168.99.170:8082/api/sys/company/delete', [row.id]);
       ElMessage.success('删除成功');
       fetchCompanyList();
     })
@@ -139,7 +139,7 @@ const handleBatchDelete = () => {
   ElMessageBox.confirm('确定要批量删除选中的公司吗？', '提示', { type: 'warning' })
     .then(async () => {
       const ids = multipleSelection.value.map(item => item.id);
-      await axios.post('http://localhost:8082/api/sys/company/delete', ids);
+      await axios.post('http://192.168.99.170:8082/api/sys/company/delete', ids);
       ElMessage.success('批量删除成功');
       fetchCompanyList();
       if (tableRef.value) tableRef.value.clearSelection();

@@ -15,7 +15,7 @@ export const sendChatMessage = async (formData: FormData, companyCode?: string):
   if (companyCode) {
     formData.append('companyCode', companyCode);
   }
-  const response = await axios.post<VoucherResponse>('http://localhost:8081/api/open-ai/send', formData, {
+  const response = await axios.post<VoucherResponse>('http://192.168.99.170:8081/api/open-ai/send', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   return response.data;
