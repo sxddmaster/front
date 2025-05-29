@@ -37,9 +37,12 @@
                     <div v-for="(voucher, index) in msg.vouchers" :key="index" class="voucher-container">
                       <div class="voucher-title">凭证 {{ index + 1 }}</div>
                       <div>摘要：{{ voucher.summary }}</div>
+                      <div>业务编码：{{ voucher.businessNo || '-' }}</div>
+                      <div class="voucher-date">凭证日期：{{ voucher.voucherDate || '-' }}</div>
                       <table class="voucher-table">
                         <thead>
                           <tr>
+                            <th>序号</th>
                             <th>科目</th>
                             <th>明细科目</th>
                             <th>借方</th>
@@ -48,6 +51,7 @@
                         </thead>
                         <tbody>
                           <tr v-for="(entry, i) in voucher.entries" :key="i">
+                            <td>{{ entry.orderNo }}</td>
                             <td>{{ entry.subject }}</td>
                             <td>{{ entry.detailSubject }}</td>
                             <td>{{ entry.debit }}</td>
@@ -141,27 +145,24 @@ import { ElMessage } from 'element-plus'
 import { sendChatMessage } from '../api/chat'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { useCompanyStore } from '../store/companyStore'
-
-interface VoucherEntry {
-  subject: string;
-  detailSubject: string;
-  debit: string;
-  credit: string;
-}
-
-interface VoucherResponse {
-  summary: string;
-  entries: VoucherEntry[];
-}
+import type { VoucherResponse, VoucherEntry } from '../api/chat'
 
 interface ChatMessage {
   role: 'user' | 'ai'
   text: string
-  vouchers?: VoucherResponse[]
+  vouchers?: VoucherResponseLocal[]
   image?: string
   imageType?: string
   fileName?: string
   fileRaw?: File | undefined
+}
+
+// 本地扩展类型用于渲染（带orderNo）
+interface VoucherEntryLocal extends VoucherEntry {
+  orderNo: string;
+}
+interface VoucherResponseLocal extends Omit<VoucherResponse, 'entries'> {
+  entries: VoucherEntryLocal[];
 }
 
 const input = ref('')
@@ -258,9 +259,28 @@ const send = async () => {
     if (typeof response === 'string') {
       messages.value.push({ role: 'ai', text: response });
     } else if (Array.isArray(response)) {
-      messages.value.push({ role: 'ai', text: '', vouchers: response });
+      // voucherDate、businessNo后端一定返回，orderNo前端生成
+      const vouchers: VoucherResponseLocal[] = response.map((v: VoucherResponse) => ({
+        voucherDate: v.voucherDate,
+        summary: v.summary,
+        businessNo: v.businessNo,
+        entries: (v.entries || []).map((e: VoucherEntry, i: number) => ({
+          ...e,
+          orderNo: String(i + 1)
+        }))
+      }));
+      messages.value.push({ role: 'ai', text: '', vouchers });
     } else if (response && response.entries) {
-      messages.value.push({ role: 'ai', text: '', vouchers: [response] });
+      const voucher: VoucherResponseLocal = {
+        voucherDate: response.voucherDate,
+        summary: response.summary,
+        businessNo: response.businessNo,
+        entries: (response.entries || []).map((e: VoucherEntry, i: number) => ({
+          ...e,
+          orderNo: String(i + 1)
+        }))
+      };
+      messages.value.push({ role: 'ai', text: '', vouchers: [voucher] });
     } else {
       messages.value.push({ role: 'ai', text: JSON.stringify(response) });
     }
@@ -734,6 +754,19 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.voucher-date {
+  font-size: 14px;
+  color: #2563eb;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.voucher-table th:first-child, .voucher-table td:first-child {
+  background: #f0f9eb;
+  color: #409EFF;
+  font-weight: 600;
 }
 </style> 
 

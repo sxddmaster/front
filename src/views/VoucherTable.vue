@@ -2,23 +2,23 @@
   <div class="voucher-table-container">
     <div class="filter-bar">
       <div class="filter-actions">
-        <el-date-picker
+      <el-date-picker
           v-model="date"
           type="month"
           placeholder="请选择月份"
           format="YYYY-MM"
           value-format="YYYY-MM"
-          :clearable="true"
+        :clearable="true"
           style="width: 200px;"
-        />
-        <el-button type="primary" @click="handleSearch" :loading="loading">
-          <el-icon><Search /></el-icon>
-          查询
-        </el-button>
-        <el-button type="success" @click="handleExport" :loading="exporting">
-          <el-icon><Download /></el-icon>
-          导出
-        </el-button>
+      />
+      <el-button type="primary" @click="handleSearch" :loading="loading">
+        <el-icon><Search /></el-icon>
+        查询
+      </el-button>
+      <el-button type="success" @click="handleExport" :loading="exporting">
+        <el-icon><Download /></el-icon>
+        导出
+      </el-button>
       </div>
       <span v-if="companyName" class="company-name-label">公司：{{ companyName }}</span>
     </div>

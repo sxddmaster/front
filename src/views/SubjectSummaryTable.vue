@@ -11,14 +11,14 @@
           :clearable="true"
           style="width: 200px;"
         />
-        <el-button type="primary" @click="handleSearch" :loading="loading">
-          <el-icon><Search /></el-icon>
-          查询
-        </el-button>
-        <el-button type="success" @click="handleExport" :loading="exporting">
-          <el-icon><Download /></el-icon>
-          导出
-        </el-button>
+      <el-button type="primary" @click="handleSearch" :loading="loading">
+        <el-icon><Search /></el-icon>
+        查询
+      </el-button>
+      <el-button type="success" @click="handleExport" :loading="exporting">
+        <el-icon><Download /></el-icon>
+        导出
+      </el-button>
       </div>
       <span v-if="companyName" class="company-name-label">公司：{{ companyName }}</span>
     </div>

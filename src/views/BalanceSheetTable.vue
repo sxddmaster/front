@@ -251,4 +251,4 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(64,158,255,0.06);
 }
 .filter-container, .company-name-bar { display: none; }
-</style>
+</style> 
