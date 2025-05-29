@@ -207,7 +207,7 @@ const handleFileChange = (file: UploadFile) => {
       ElMessage.error('仅支持图片、PDF和Excel格式');
       return;
     }
-    uploadedFiles.value = [{ name: file.raw.name, raw: file.raw, uid: String(file.uid) }];
+    uploadedFiles.value.push({ name: file.raw.name, raw: file.raw, uid: String(file.uid) });
   }
 }
 const handleBeforeRemove = () => true;
@@ -252,15 +252,34 @@ const send = async () => {
   try {
     const formData = new FormData();
     formData.append('message', userMessage);
-    if (uploadedFiles.value.length > 0) {
-      formData.append('file', uploadedFiles.value[0].raw);
-    }
+    uploadedFiles.value.forEach(f => formData.append('fileList', f.raw));
     const response = await sendChatMessage(formData, companyStore.companyCode);
-    if (typeof response === 'string') {
-      messages.value.push({ role: 'ai', text: response });
-    } else if (Array.isArray(response)) {
-      // voucherDate、businessNo后端一定返回，orderNo前端生成
-      const vouchers: VoucherResponseLocal[] = response.map((v: VoucherResponse) => ({
+    let data = response && (response as any).data ? (response as any).data : response;
+    // 兼容data为字符串数组（每个元素为JSON字符串）
+    if (Array.isArray(data) && typeof data[0] === 'string') {
+      data = data.map(str => {
+        try {
+          return JSON.parse(str);
+        } catch {
+          return [];
+        }
+      });
+    }
+    if (Array.isArray(data) && Array.isArray(data[0])) {
+      for (const group of data) {
+        const vouchers: VoucherResponseLocal[] = group.map((v: VoucherResponse) => ({
+          voucherDate: v.voucherDate,
+          summary: v.summary,
+          businessNo: v.businessNo,
+          entries: (v.entries || []).map((e: VoucherEntry, i: number) => ({
+            ...e,
+            orderNo: String(i + 1)
+          }))
+        }));
+        messages.value.push({ role: 'ai', text: '', vouchers });
+      }
+    } else if (Array.isArray(data)) {
+      const vouchers: VoucherResponseLocal[] = data.map((v: VoucherResponse) => ({
         voucherDate: v.voucherDate,
         summary: v.summary,
         businessNo: v.businessNo,
@@ -270,19 +289,19 @@ const send = async () => {
         }))
       }));
       messages.value.push({ role: 'ai', text: '', vouchers });
-    } else if (response && response.entries) {
+    } else if (data && data.entries) {
       const voucher: VoucherResponseLocal = {
-        voucherDate: response.voucherDate,
-        summary: response.summary,
-        businessNo: response.businessNo,
-        entries: (response.entries || []).map((e: VoucherEntry, i: number) => ({
+        voucherDate: data.voucherDate,
+        summary: data.summary,
+        businessNo: data.businessNo,
+        entries: (data.entries || []).map((e: VoucherEntry, i: number) => ({
           ...e,
           orderNo: String(i + 1)
         }))
       };
       messages.value.push({ role: 'ai', text: '', vouchers: [voucher] });
     } else {
-      messages.value.push({ role: 'ai', text: JSON.stringify(response) });
+      messages.value.push({ role: 'ai', text: JSON.stringify(data) });
     }
   } catch (error) {
     ElMessage.error('发送消息失败，请重试');
