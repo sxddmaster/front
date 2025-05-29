@@ -101,6 +101,7 @@
               :before-remove="handleBeforeRemove"
               :accept="'.png,.jpg,.jpeg,.bmp,.gif,.tiff,.webp,.pdf,.xlsx,.xls'"
               class="upload-btn"
+              multiple
             >
               <el-button 
                 type="primary" 
@@ -195,25 +196,42 @@ const handleEnter = () => {
   send()
 }
 
-const handleFileChange = (file: UploadFile) => {
-  if (file.raw) {
-    const allowedTypes = [
-      'image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/gif', 'image/tiff', 'image/webp',
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel' // .xls
-    ];
-    if (!allowedTypes.includes(file.raw.type)) {
-      ElMessage.error('仅支持图片、PDF和Excel格式');
-      return;
-    }
-    uploadedFiles.value.push({ name: file.raw.name, raw: file.raw, uid: String(file.uid) });
+const handleFileChange = (file: UploadFile, fileList: UploadFile[]) => {
+  if (!file.raw) return;
+  const allowedExts = ['pdf', 'xlsx', 'xls', 'png', 'jpg', 'jpeg', 'bmp', 'gif', 'tiff', 'webp'];
+  const ext = file.raw.name.split('.').pop()?.toLowerCase() || '';
+  if (!allowedExts.includes(ext)) {
+    ElMessage.error(`仅支持图片、PDF和Excel格式，当前文件：${file.raw.name} [type=${file.raw.type}]`);
+    return;
   }
-}
+  // 判断是否已添加
+  const already = uploadedFiles.value.some(uf =>
+    uf.name === file.raw!.name &&
+    uf.raw.size === file.raw!.size &&
+    uf.raw.lastModified === file.raw!.lastModified
+  );
+  if (already) {
+    ElMessage.error(`文件已添加：${file.raw.name}`);
+    return;
+  }
+  uploadedFiles.value.push({
+    name: file.raw.name,
+    raw: file.raw,
+    uid: String(file.uid)
+  });
+};
+
 const handleBeforeRemove = () => true;
 
 const removeUploadedFile = (idx: number) => {
+  const file = uploadedFiles.value[idx];
   uploadedFiles.value.splice(idx, 1);
+  // 移除 uploadRef 里的文件
+  if (uploadRef.value) {
+    const uploadFiles = ((uploadRef.value as any).uploadFiles || []) as UploadFile[];
+    const i = uploadFiles.findIndex((f: any) => f.name === file.name && f.size === file.raw.size);
+    if (i !== -1) uploadFiles.splice(i, 1);
+  }
 }
 
 const send = async () => {
@@ -308,6 +326,7 @@ const send = async () => {
   } finally {
     loading.value = false;
     uploadedFiles.value = [];
+    uploadRef.value?.clearFiles();
     await scrollToBottom();
   }
 };
