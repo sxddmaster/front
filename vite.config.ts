@@ -22,7 +22,7 @@ export default defineConfig({
 
     
     proxy: {
-      '/api': 'http://192.168.99.170:8082'
+      '/api': 'http://localhost:8082'
     },
   },
   build: {

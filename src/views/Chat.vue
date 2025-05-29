@@ -269,9 +269,10 @@ const send = async () => {
   loading.value = true;
   try {
     const formData = new FormData();
-    formData.append('message', userMessage);
+    formData.append('message',userMessage);
+    formData.append('companyCode', companyStore.companyCode);
     uploadedFiles.value.forEach(f => formData.append('fileList', f.raw));
-    const response = await sendChatMessage(formData, companyStore.companyCode);
+    const response = await sendChatMessage(formData);
     let data = response && (response as any).data ? (response as any).data : response;
     // 兼容data为字符串数组（每个元素为JSON字符串）
     if (Array.isArray(data) && typeof data[0] === 'string') {
