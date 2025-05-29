@@ -303,7 +303,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 const canSend = computed(() => {
-  return uploadedFiles.value.length > 0;
+  return input.value.trim().length > 0 || uploadedFiles.value.length > 0;
 });
 
 // 判断字符串是否为JSON
