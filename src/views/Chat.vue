@@ -1,6 +1,41 @@
 <template>
   <div class="chat-page">
     <div class="chat-container">
+      <div class="export-button-container">
+        <el-button 
+          type="primary" 
+          @click="showExportDialog"
+          class="export-button"
+        >
+          <el-icon><Download /></el-icon>
+          导出工资表模板
+        </el-button>
+      </div>
+      
+      <el-dialog
+        v-model="exportDialogVisible"
+        title="选择年月"
+        width="300px"
+        :close-on-click-modal="false"
+      >
+        <el-date-picker
+          v-model="selectedYearMonth"
+          type="month"
+          placeholder="选择年月"
+          format="YYYY-MM"
+          value-format="YYYY-MM"
+          :default-value="new Date()"
+        />
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="exportDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleExport" :loading="exporting">
+              导出
+            </el-button>
+          </span>
+        </template>
+      </el-dialog>
+
       <div class="messages" ref="messagesRef">
         <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role]">
           <div class="message-content" :class="msg.role">
@@ -141,12 +176,13 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed } from 'vue'
-import { User, Service, Position, PictureFilled, Close } from '@element-plus/icons-vue'
+import { User, Service, Position, PictureFilled, Close, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendChatMessage } from '../api/chat'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { useCompanyStore } from '../store/companyStore'
 import type { VoucherResponse, VoucherEntry } from '../api/chat'
+import axios from 'axios'
 
 interface ChatMessage {
   role: 'user' | 'ai'
@@ -184,6 +220,11 @@ const isExcelPreview = computed(() => previewFile.value && (
 ))
 
 const companyStore = useCompanyStore()
+
+// 导出相关
+const exportDialogVisible = ref(false)
+const selectedYearMonth = ref('')
+const exporting = ref(false)
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -378,6 +419,54 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
     previewUrl.value = ''
   }
   previewVisible.value = true
+}
+
+// 显示导出对话框
+const showExportDialog = () => {
+  // 设置默认值为当前年月
+  const now = new Date()
+  selectedYearMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  exportDialogVisible.value = true
+}
+
+// 处理导出
+const handleExport = async () => {
+  if (!selectedYearMonth.value) {
+    ElMessage.warning('请选择年月')
+    return
+  }
+
+  exporting.value = true
+  try {
+    const response = await axios.get('/api/sys/excelTemplateExport/payroll-export', {
+      params: {
+        yearMonth: selectedYearMonth.value,
+        companyCode: companyStore.companyCode
+      },
+      responseType: 'blob' // 重要：设置响应类型为blob
+    })
+
+    // 创建下载链接
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `工资表模板_${selectedYearMonth.value}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('导出成功')
+    exportDialogVisible.value = false
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请重试')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -806,6 +895,31 @@ const handlePreviewFile = (file: { name: string; raw: File; uid?: string }) => {
   background: #f0f9eb;
   color: #409EFF;
   font-weight: 600;
+}
+
+/* 添加导出按钮样式 */
+.export-button-container {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.export-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.export-button .el-icon {
+  font-size: 16px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
 }
 </style> 
 
