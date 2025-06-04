@@ -5,6 +5,7 @@
         <el-menu :default-active="activeTab" @select="handleTabChange" class="tab-menu">
           <el-menu-item index="voucher">记账凭证</el-menu-item>
           <el-menu-item index="subjectSummary">科目汇总表</el-menu-item>
+          <el-menu-item index="balance">科目余额表</el-menu-item>
           <!-- <el-menu-item index="equityChange">所有者权益变动表</el-menu-item> -->
           <!-- <el-menu-item index="cashFlow">现金流量表</el-menu-item> -->
           <el-menu-item index="profit">利润表</el-menu-item>
@@ -26,6 +27,7 @@ import SubjectSummaryTable from './SubjectSummaryTable.vue';
 import CashFlowTable from './CashFlowTable.vue';
 import ProfitTable from './ProfitTable.vue';
 import BalanceSheetTable from './BalanceSheetTable.vue';
+import BalanceTable from './BalanceTable.vue';
 
 const activeTab = ref('voucher');
 const tabMap: Record<string, any> = {
