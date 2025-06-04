@@ -37,6 +37,7 @@ const tabMap: Record<string, any> = {
   cashFlow: CashFlowTable,
   profit: ProfitTable,
   balanceSheet: BalanceSheetTable,
+  balance: BalanceTable,
 };
 const EmptyComponent = defineComponent({ template: '<div></div>' });
 const currentComponent = computed(() => tabMap[activeTab.value] || EmptyComponent);

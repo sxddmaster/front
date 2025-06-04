@@ -310,11 +310,60 @@ const send = async () => {
   loading.value = true;
   try {
     const formData = new FormData();
-    formData.append('message',userMessage);
+    formData.append('message', userMessage);
     formData.append('companyCode', companyStore.companyCode);
+    formData.append('dataSource', companyStore.dataSource);
     uploadedFiles.value.forEach(f => formData.append('fileList', f.raw));
     const response = await sendChatMessage(formData);
     let data = response && (response as any).data ? (response as any).data : response;
+    
+    // 处理标准响应格式 {code: 200, msg: string, data: any}
+    if (data && typeof data === 'object' && 'code' in data && 'msg' in data && 'data' in data) {
+      if (data.code === 200) {
+        // 如果 data.data 是字符串数组
+        if (Array.isArray(data.data) && data.data.length > 0) {
+          const firstItem = data.data[0];
+          if (typeof firstItem === 'string') {
+            try {
+              // 尝试解析为 JSON
+              const parsed = JSON.parse(firstItem);
+              // 如果是数组且包含凭证数据，按原有逻辑处理
+              if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].entries) {
+                const vouchers: VoucherResponseLocal[] = parsed.map((v: VoucherResponse) => ({
+                  voucherDate: v.voucherDate,
+                  summary: v.summary,
+                  businessNo: v.businessNo,
+                  entries: (v.entries || []).map((e: VoucherEntry, i: number) => ({
+                    ...e,
+                    orderNo: String(i + 1)
+                  }))
+                }));
+                messages.value.push({ role: 'ai', text: '', vouchers });
+              } else {
+                // 如果不是凭证数据，显示原始字符串
+                messages.value.push({ role: 'ai', text: firstItem });
+              }
+            } catch (e) {
+              // 如果解析失败，说明是普通文本消息
+              messages.value.push({ role: 'ai', text: firstItem });
+            }
+            return;
+          }
+        }
+        // 如果 data.data 不是字符串数组，尝试使用 msg
+        if (data.msg && data.msg !== '请求处理成功') {
+          messages.value.push({ role: 'ai', text: data.msg });
+        } else {
+          messages.value.push({ role: 'ai', text: '处理成功' });
+        }
+      } else {
+        // 处理错误情况
+        messages.value.push({ role: 'ai', text: data.msg || '处理失败' });
+      }
+      return;
+    }
+
+    // 兼容原有格式
     // 兼容data为字符串数组（每个元素为JSON字符串）
     if (Array.isArray(data) && typeof data[0] === 'string') {
       data = data.map(str => {
@@ -361,7 +410,7 @@ const send = async () => {
       };
       messages.value.push({ role: 'ai', text: '', vouchers: [voucher] });
     } else {
-      messages.value.push({ role: 'ai', text: JSON.stringify(data) });
+      messages.value.push({ role: 'ai', text: typeof data === 'string' ? data : JSON.stringify(data) });
     }
   } catch (error) {
     ElMessage.error('发送消息失败，请重试');

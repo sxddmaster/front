@@ -17,7 +17,7 @@
       <el-table-column prop="companyCode" label="公司代码" width="120" />
       <el-table-column prop="companyName" label="公司名称">
         <template #default="scope">
-          <span class="company-link" @click="goToHome(scope.row.companyCode)">{{ scope.row.companyName }}</span>
+          <span class="company-link" @click="goToHome(scope.row.companyCode, scope.row.dataSource)">{{ scope.row.companyName }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="companyType" label="公司类型" width="120">
@@ -61,18 +61,25 @@ import { ref, onMounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { storeToRefs } from 'pinia';
+import { useCompanyStore } from '../store/companyStore';
 
 interface CompanyOption {
   id?: number;
   companyCode?: string;
   companyName: string;
   companyType: number;
+  dataSource?: string;
 }
 
 const companyList = ref<CompanyOption[]>([]);
 const router = useRouter();
 const tableRef = ref();
 const multipleSelection = ref<CompanyOption[]>([]);
+
+// 初始化 store
+const store = useCompanyStore();
+const { dataSource } = storeToRefs(store);
 
 const dialogVisible = ref(false);
 const dialogMode = ref<'add' | 'edit'>('add');
@@ -151,8 +158,14 @@ const handleSelectionChange = (val: CompanyOption[]) => {
   multipleSelection.value = val;
 };
 
-const goToHome = (companyCode: string) => {
-  router.push({ name: 'home', query: { companyCode } });
+const goToHome = (companyCode: string, dataSource?: string) => {
+  try {
+    store.setDataSource(dataSource || '');
+    router.push({ name: 'home', query: { companyCode } });
+  } catch (error) {
+    console.error('Error setting dataSource:', error);
+    router.push({ name: 'home', query: { companyCode } });
+  }
 };
 
 onMounted(() => {
